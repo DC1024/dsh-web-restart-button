@@ -1,0 +1,45 @@
+# Example compose for DeepSeek Harness + the injected restart button.
+#
+# dsh refuses --host 0.0.0.0 on purpose (it can run shell commands), so it only
+# ever listens on 127.0.0.1 inside the container and nginx fronts it.
+#
+# Before first start:
+#   mkdir -p dsh-home workspace
+#   sudo chown -R 1000:1000 dsh-home workspace   # container runs as uid 1000 (node)
+#   openssl passwd -apr1 'your-password' | sed 's|^|admin:|' > htpasswd
+#
+# Start: docker compose up -d
+# UI:    http://<host>:3080/go      (auto-exchanges the launch token)
+
+services:
+  dsh:
+    build: .
+    image: dsh-web:local
+    container_name: dsh-web
+
+    # REQUIRED for the restart button: dsh dying must end the container so that
+    # this policy rebuilds the whole stack.
+    restart: unless-stopped
+
+    ports:
+      # host:container. The container side is nginx (8080), never dsh itself.
+      - "3080:8080"
+
+    environment:
+      TZ: Asia/Shanghai
+      # Required when the browser does not come from loopback, otherwise the
+      # API answers 401/403 (DNS-rebinding / cross-site guard).
+      DSH_TRUSTED_HOST: "your-host-or-ip"
+      # Only used for the hint printed in the logs.
+      PUBLISHED_PORT: "3080"
+      # Never bake the key into the image; pass it at run time:
+      # DEEPSEEK_API_KEY: "sk-xxxxxxxx"
+
+    volumes:
+      - ./dsh-home:/home/node/.dsh     # profiles, credentials, sessions, plugins
+      - ./workspace:/workspace         # the only directory the agent may touch
+      - ./htpasswd:/etc/nginx/.htpasswd:ro   # HTTP Basic Auth (see nginx.conf)
+
+    # dsh can execute shell commands; keep it off the host network.
+    security_opt:
+      - no-new-privileges:true
