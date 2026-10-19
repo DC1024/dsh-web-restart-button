@@ -113,6 +113,7 @@ wait "${DSH_PID}"     # dsh 一退出，容器就退出 → restart policy 重�
 3. **改脚本要带版本号** `?v=N`，不然浏览器用缓存，你会以为没生效。
 4. **nginx 非 root 运行时要显式写全 5 个 temp path**（client_body / proxy / fastcgi / uwsgi / scgi），否则 `mkdir() "/var/lib/nginx/fastcgi" Permission denied` 让容器不停重启。
 5. **登录页不渲染按钮**（脚本里判断 `location.pathname === '/login'`）。
+6. **dsh `0.2.0-rc.2` 起不再把启动 token 打到 stdout。** entrypoint 里那句 `grep 'token='` 会匹配不到；在 `set -e` + `pipefail` 下 grep 返回非 0 会让整个脚本在 `wait` **之前**就自杀 → 容器退出 → `restart: unless-stopped` 把它无限重启（正是我们踩到的重启死循环）。修复：`grep` 末尾加 `|| true`，再把 `TOKEN` `export` 出去（见 `entrypoint.sh`）。
 
 ## 安全
 

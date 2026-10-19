@@ -34,7 +34,12 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-TOKEN="$(grep -o 'token=[A-Za-z0-9_-]*' /tmp/dsh.log | head -1 | cut -d= -f2)"
+# NOTE: dsh 0.2.0-rc.2 no longer prints the launch token to stdout, so this
+# grep normally finds nothing. The `|| true` is required: with `set -e` a
+# non-matching grep would abort the whole entrypoint and the container would
+# exit -> `unless-stopped` would restart it forever (the exact loop we hit).
+TOKEN="$(grep -o 'token=[A-Za-z0-9_-]*' /tmp/dsh.log 2>/dev/null | head -1 | cut -d= -f2)" || true
+export TOKEN
 
 # nginx reads this include to build the /go redirect. dsh mints a new launch
 # token on every start, so nothing may be hard-coded in nginx.conf.
